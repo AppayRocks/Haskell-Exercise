@@ -10,6 +10,7 @@ module Foundation where
 
 import Import.NoFoundation
 import Control.Monad.Logger        (LogSource)
+import Data.Text
 import Text.Hamlet                 (hamletFile)
 import Text.Jasmine                (minifym)
 import Yesod.Core.Types            (Logger)
