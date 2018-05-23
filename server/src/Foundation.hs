@@ -1,23 +1,33 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE CPP                   #-}
+{-# LANGUAGE DeriveAnyClass        #-}
+{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE InstanceSigs          #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE ViewPatterns          #-}
+module Foundation
+    ( App(..)
+    , resourcesApp
+    , Handler
+    , unsafeHandler
+    , Route(..)
+    , Form
+    ) where
 
-module Foundation where
-
-import Import.NoFoundation
-import Control.Monad.Logger        (LogSource)
-import Data.Text
-import Text.Hamlet                 (hamletFile)
-import Text.Jasmine                (minifym)
-import Yesod.Core.Types            (Logger)
-import Yesod.Default.Util          (addStaticContentExternal)
-import qualified Yesod.Core.Unsafe as Unsafe
+import           Control.Monad.Logger (LogSource)
 import qualified Data.CaseInsensitive as CI
-import qualified Data.Text.Encoding as TE
+import qualified Data.Text.Encoding   as TE
+import           Database.Persist.Sql (ConnectionPool, runSqlPool)
+import           Import.NoFoundation
+import           Text.Hamlet          (hamletFile)
+import           Text.Jasmine         (minifym)
+import           Yesod.Auth.Dummy     (authDummy)
+import           Yesod.Core.Types     (Logger)
+import qualified Yesod.Core.Unsafe    as Unsafe
+import           Yesod.Default.Util   (addStaticContentExternal)
 
 -- | The foundation datatype for your application. This can be a good place to
 -- keep settings and values requiring initialization before your application
@@ -26,13 +36,14 @@ import qualified Data.Text.Encoding as TE
 data App = App
     { appSettings    :: AppSettings
     , appStatic      :: Static -- ^ Settings for static file serving.
+    , appConnPool    :: ConnectionPool -- ^ Database connection pool.
     , appHttpManager :: Manager
     , appLogger      :: Logger
     }
 
 data MenuItem = MenuItem
-    { menuItemLabel :: Text
-    , menuItemRoute :: Route App
+    { menuItemLabel          :: Text
+    , menuItemRoute          :: Route App
     , menuItemAccessCallback :: Bool
     }
 
@@ -65,7 +76,7 @@ instance Yesod App where
     approot :: Approot App
     approot = ApprootRequest $ \app req ->
         case appRoot $ appSettings app of
-            Nothing -> getApprootText guessApproot app req
+            Nothing   -> getApprootText guessApproot app req
             Just root -> root
 
     -- Store session data on the client in encrypted cookies,
@@ -127,9 +138,9 @@ instance Yesod App where
         -> Handler AuthResult
     -- Routes not requiring authenitcation.
     isAuthorized FaviconR _ = return Authorized
-    isAuthorized RobotsR _ = return Authorized
+    isAuthorized RobotsR _  = return Authorized
     -- Default to Authorized for now.
-    isAuthorized _ _ = return Authorized
+    isAuthorized _ _        = return Authorized
 
     -- This function creates static content files in the static folder
     -- and names them based on a hash of their content. This allows
@@ -167,6 +178,46 @@ instance Yesod App where
     makeLogger :: App -> IO Logger
     makeLogger = return . appLogger
 
+-- How to run database actions.
+instance YesodPersist App where
+    type YesodPersistBackend App = SqlBackend
+    runDB action = do
+        master <- getYesod
+        runSqlPool action $ appConnPool master
+instance YesodPersistRunner App where
+    getDBRunner = defaultGetDBRunner appConnPool
+
+
+instance YesodAuth App where
+    type AuthId App = UserId
+
+    -- Where to send a user after successful login
+    loginDest _ = HomeR
+    -- Where to send a user after logout
+    logoutDest _ = HomeR
+    -- Override the above two destinations when a Referer: header is present
+    redirectToReferer _ = True
+
+    authenticate creds = liftHandler $ runDB $ do
+        x <- getBy $ UniqueUser $ credsIdent creds
+        case x of
+            Just (Entity uid _) -> return $ Authenticated uid
+            Nothing -> Authenticated <$> insert User
+                { userIdent = credsIdent creds
+                , userPassword = Nothing
+                }
+
+    -- You can add other plugins like Google Email, email or OAuth here
+    -- authPlugins _ = [authOpenId Claimed []]
+    -- authPlugins _ = [ authHashDB (Just . UniqueUser)]
+    authPlugins app = [authDummy | appAuthDummyLogin $ appSettings app]
+
+    -- authHttpManager = getHttpManager
+
+
+instance YesodAuthPersist App
+
+
 -- Define breadcrumbs.
 instance YesodBreadcrumbs App where
     -- Takes the route that the user is currently on, and returns a tuple
@@ -176,7 +227,7 @@ instance YesodBreadcrumbs App where
         :: Route App  -- ^ The route the user is visiting currently.
         -> Handler (Text, Maybe (Route App))
     breadcrumb HomeR = return ("Home", Nothing)
-    breadcrumb  _ = return ("home", Nothing)
+    breadcrumb  _    = return ("home", Nothing)
 
 -- This instance is required to use forms. You can modify renderMessage to
 -- achieve customized and internationalized form validation messages.

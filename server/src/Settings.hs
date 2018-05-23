@@ -10,17 +10,26 @@
 -- declared in the Foundation.hs file.
 module Settings where
 
-import ClassyPrelude.Yesod
-import qualified Control.Exception as Exception
-import Data.Aeson                  (Result (..), fromJSON, withObject, (.!=),
-                                    (.:?))
-import Data.FileEmbed              (embedFile)
-import Data.Yaml                   (decodeEither')
-import Language.Haskell.TH.Syntax  (Exp, Name, Q)
-import Network.Wai.Handler.Warp    (HostPreference)
-import Yesod.Default.Config2       (applyEnvValue, configSettingsYml)
-import Yesod.Default.Util          (WidgetFileSettings, widgetFileNoReload,
-                                    widgetFileReload)
+import           ClassyPrelude.Yesod
+import qualified Control.Exception           as Exception
+import           Data.Aeson                  (Result (..), fromJSON, withObject,
+                                              (.!=), (.:?))
+import           Data.FileEmbed              (embedFile)
+import           Data.Yaml                   (decodeEither')
+import           Database.Persist.Postgresql (PostgresConf)
+{-- If you want to use multiple database**** then only
+#if POSTGRESQL
+import           Database.Persist.Postgresql (PostgresConf)
+#else
+import           Database.Persist.Sqlite     (SqliteConf)
+#endif
+--}
+import           Language.Haskell.TH.Syntax  (Exp, Name, Q)
+import           Network.Wai.Handler.Warp    (HostPreference)
+import           Yesod.Default.Config2       (applyEnvValue, configSettingsYml)
+import           Yesod.Default.Util          (WidgetFileSettings,
+                                              widgetFileNoReload,
+                                              widgetFileReload)
 
 -- | Runtime settings to configure this application. These settings can be
 -- loaded from various sources: defaults, environment variables, config files,
@@ -28,6 +37,14 @@ import Yesod.Default.Util          (WidgetFileSettings, widgetFileNoReload,
 data AppSettings = AppSettings
     { appStaticDir              :: String
     -- ^ Directory from which to serve static files.
+    , appDatabaseConf           :: PostgresConf
+{-- If you want to use multiple database**** then only
+#if POSTGRESQL
+    , appDatabaseConf           :: PostgresConf
+#else
+    , appDatabaseConf           :: SqliteConf
+#endif
+--}
     , appRoot                   :: Maybe Text
     -- ^ Base for all generated URLs. If @Nothing@, determined
     -- from the request headers.
@@ -55,6 +72,9 @@ data AppSettings = AppSettings
     -- ^ Copyright text to appear in the footer of the page
     , appAnalytics              :: Maybe Text
     -- ^ Google Analytics code
+
+    , appAuthDummyLogin         :: Bool
+    -- ^ Indicate if auth dummy login should be enabled.
     }
 
 instance FromJSON AppSettings where
@@ -66,6 +86,7 @@ instance FromJSON AppSettings where
                 False
 #endif
         appStaticDir              <- o .: "static-dir"
+        appDatabaseConf           <- o .: "database"
         appRoot                   <- o .:? "approot"
         appHost                   <- fromString <$> o .: "host"
         appPort                   <- o .: "port"
@@ -81,6 +102,8 @@ instance FromJSON AppSettings where
 
         appCopyright              <- o .: "copyright"
         appAnalytics              <- o .:? "analytics"
+
+        appAuthDummyLogin         <- o .:? "auth-dummy-login"      .!= defaultDev
 
         return AppSettings {..}
 
@@ -119,7 +142,7 @@ configSettingsYmlValue = either Exception.throw id
 compileTimeAppSettings :: AppSettings
 compileTimeAppSettings =
     case fromJSON $ applyEnvValue False mempty configSettingsYmlValue of
-        Error e -> error e
+        Error e          -> error e
         Success settings -> settings
 
 -- The following two functions can be used to combine multiple CSS or JS files

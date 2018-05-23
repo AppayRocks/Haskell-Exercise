@@ -8,7 +8,6 @@ copyright:           "2018 Sarwe.Appay"
 
 extra-source-files:
 - README.md
-- ChangeLog.md
 
 # Metadata used when publishing your package
 # synopsis:            Short description of your package
@@ -26,6 +25,7 @@ dependencies:
 
 - yesod >=1.6 && <1.7
 - yesod-core >=1.6 && <1.7
+- yesod-auth >=1.6 && <1.7
 - yesod-static >=1.6 && <1.7
 - yesod-form >=1.6 && <1.7
 - classy-prelude >=1.4 && <1.5
@@ -33,6 +33,9 @@ dependencies:
 - classy-prelude-yesod >=1.4 && <1.5
 - bytestring >=0.9 && <0.11
 - text >=0.11 && <2.0
+- persistent >=2.0 && <2.9
+- persistent-postgresql >=2.1.1 && <2.9
+- persistent-template >=2.0 && <2.8
 - template-haskell
 - shakespeare >=2.0 && <2.1
 - hjsmin >=0.1 && <0.3

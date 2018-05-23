@@ -1,9 +1,10 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell   #-}
 module Handler.Mirror where
 
-import Import
 import qualified Data.Text as T
+import           Import
 
 getMirrorR :: Handler Html
 getMirrorR = defaultLayout $(widgetFile "mirror")
