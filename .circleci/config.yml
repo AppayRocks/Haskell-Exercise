@@ -20,13 +20,13 @@ jobs:
       # Download and cache dependencies
       - restore_cache:
           keys:
-          - v1-dependencies-{{ checksum "requirements.txt" }}
+          - v1-dependencies-{{ checksum "~/project/server/package.yaml" }}
           # fallback to using the latest cache if no exact match is found
           - v1-dependencies-
       - run:
           name: database setup
           command: |
-              service postgresql restart
+              # service postgresql restart
               sudo -u postgres psql -c "ALTER ROLE postgres WITH PASSWORD 'postgres'; CREATE USER app_data WITH SUPERUSER PASSWORD 'app_data';"
               sudo -u postgres psql -c "CREATE DATABASE app_data;"
       - run:
@@ -45,6 +45,5 @@ jobs:
       - save_cache:
           paths:
               - ~/project/server/.stack-work
-          key: v1-dependencies-{{ checksum "requirements.txt" }}
+          key: v1-dependencies-{{ checksum "~/project/server/package.yaml" }}
         
-          
