@@ -1,0 +1,65 @@
+branches:
+  only:
+    - master
+
+dist: trusty
+# Use new container infrastructure to enable caching
+sudo: false
+env: DISPLAY=':99.0'
+
+# Do not choose a language; we provide our own build tools.
+language: generic
+
+# Caching so the next build will be fast too.
+cache:
+  directories:
+  - apt
+  - $HOME/.stack
+  - $HOME/.nvm
+  - $HOME/local/
+
+# Ensure necessary system libraries are present
+addons:
+  postgresql: "9.6"
+  apt:
+    sources:
+      - google-chrome
+    packages:
+      - libgflags-dev
+      - libgoogle-glog-dev
+      - libleveldb-dev
+      - liblmdb-dev
+      - libopencv-dev
+      - libprotobuf-dev
+      - protobuf-compiler
+      - libpq-dev
+      - libxml2
+      - checkinstall
+      - fakeroot
+      - nodejs
+      - npm
+      - google-chrome-stable
+
+before_install:
+# Download and unpack the stack executable
+- echo $HOME
+- mkdir -p ~/.local/bin
+- export PATH=$HOME/.local/bin:$PATH
+- travis_retry curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
+
+install:
+# Build dependencies
+- pushd server
+- stack --no-terminal --install-ghc test --only-dependencies
+- stack clean && stack build --no-terminal --only-dependencies
+
+before_script:
+- sh -e /etc/init.d/xvfb start
+- sudo /etc/init.d/postgresql restart
+- psql -Upostgres --command "ALTER ROLE postgres WITH PASSWORD 'postgres'; CREATE USER myserver WITH SUPERUSER PASSWORD 'myserver';"
+- createdb -O postgres myserver
+
+script:
+# - chmod +x ./execute_test.sh && ./execute_test.sh
+- stack test
+- popd
