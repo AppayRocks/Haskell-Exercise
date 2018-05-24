@@ -42,6 +42,7 @@ jobs:
           key: v1-dependencies-{{ checksum "~/project/server/package.yaml" }}
           paths:
               - ~/project/server/.stack-work
+              - ~/.stack
       # run tests!
       - run:
           name: run tests
@@ -53,3 +54,4 @@ jobs:
           key: v2-dependencies-{{ checksum "~/project/server/package.yaml" }}
           paths:
               - ~/project/server/.stack-work
+              - ~/.stack
