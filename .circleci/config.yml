@@ -23,6 +23,9 @@ jobs:
           - v1-dependencies-{{ checksum "~/project/server/package.yaml" }}
           # fallback to using the latest cache if no exact match is found
           - v1-dependencies-
+          - v2-dependencies-{{ checksum "~/project/server/package.yaml" }}
+          # fallback to using the latest cache if no exact match is found
+          - v2-dependencies-
       - run:
           name: database setup
           command: |
@@ -35,6 +38,11 @@ jobs:
             pushd server
             stack clean && stack build
             popd
+      - save_cache:
+          key: v1-dependencies-{{ checksum "~/project/server/package.yaml" }}
+          paths:
+              - ~/project/server/.stack-work
+              - ~/.stack
       # run tests!
       - run:
           name: run tests
@@ -43,6 +51,7 @@ jobs:
             stack test --no-terminal
             popd
       - save_cache:
+          key: v2-dependencies-{{ checksum "~/project/server/package.yaml" }}
           paths:
               - ~/project/server/.stack-work
-          key: v1-dependencies-{{ checksum "~/project/server/package.yaml" }}
+              - ~/.stack
